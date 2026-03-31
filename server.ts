@@ -211,9 +211,12 @@ async function startServer() {
   });
 
   app.get("/api/courses/:id", authenticateToken, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const courseRepo = AppDataSource.getRepository(Course);
     const course = await courseRepo.findOne({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       relations: ["modules"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
@@ -230,10 +233,13 @@ async function startServer() {
   });
 
   app.put("/api/courses/:id", authenticateToken, isAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const { title, description, modules } = req.body;
     const courseRepo = AppDataSource.getRepository(Course);
     const course = await courseRepo.findOne({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       relations: ["modules"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
@@ -262,11 +268,14 @@ async function startServer() {
 
   // --- Enrollment Endpoints ---
   app.post("/api/courses/:id/enroll", authenticateToken, async (req: any, res: any) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const courseRepo = AppDataSource.getRepository(Course);
     const userRepo = AppDataSource.getRepository(User);
 
     const course = await courseRepo.findOne({ 
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       relations: ["users"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
@@ -286,11 +295,14 @@ async function startServer() {
   });
 
   app.delete("/api/courses/:id/unenroll", authenticateToken, async (req: any, res: any) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const courseRepo = AppDataSource.getRepository(Course);
     const userRepo = AppDataSource.getRepository(User);
 
     const course = await courseRepo.findOne({ 
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       relations: ["users"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
@@ -302,9 +314,12 @@ async function startServer() {
   });
 
   app.get("/api/courses/:id/users", authenticateToken, isAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const courseRepo = AppDataSource.getRepository(Course);
     const course = await courseRepo.findOne({ 
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       relations: ["users"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
@@ -326,11 +341,14 @@ async function startServer() {
 
   // --- Progress Tracking Endpoints ---
   app.get("/api/courses/:id/progress", authenticateToken, async (req: any, res: any) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const progressRepo = AppDataSource.getRepository(CourseProgress);
     const progress = await progressRepo.findOne({
       where: { 
         user: { id: req.user.id },
-        course: { id: parseInt(req.params.id) }
+        course: { id }
       }
     });
 
@@ -345,7 +363,14 @@ async function startServer() {
   });
 
   app.post("/api/courses/:id/progress", authenticateToken, async (req: any, res: any) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const { percentageComplete, completedModules } = req.body;
+    if (percentageComplete !== undefined && isNaN(parseInt(percentageComplete))) {
+      return res.status(400).json({ message: "Invalid percentageComplete" });
+    }
+
     const progressRepo = AppDataSource.getRepository(CourseProgress);
     const userRepo = AppDataSource.getRepository(User);
     const courseRepo = AppDataSource.getRepository(Course);
@@ -353,23 +378,23 @@ async function startServer() {
     let progress = await progressRepo.findOne({
       where: { 
         user: { id: req.user.id },
-        course: { id: parseInt(req.params.id) }
+        course: { id }
       }
     });
 
     if (!progress) {
       const user = await userRepo.findOneBy({ id: req.user.id });
-      const course = await courseRepo.findOneBy({ id: parseInt(req.params.id) });
+      const course = await courseRepo.findOneBy({ id });
       if (!user || !course) return res.status(404).json({ message: "User or Course not found" });
 
       progress = progressRepo.create({
         user,
         course,
-        percentageComplete: percentageComplete || 0,
+        percentageComplete: parseInt(percentageComplete) || 0,
         completedModules: JSON.stringify(completedModules || [])
       });
     } else {
-      if (percentageComplete !== undefined) progress.percentageComplete = percentageComplete;
+      if (percentageComplete !== undefined) progress.percentageComplete = parseInt(percentageComplete);
       if (completedModules !== undefined) progress.completedModules = JSON.stringify(completedModules);
     }
 
@@ -381,23 +406,27 @@ async function startServer() {
   });
 
   app.post("/api/courses/:id/progress/toggle-module", authenticateToken, async (req: any, res: any) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+
     const { moduleId } = req.body;
+    if (isNaN(parseInt(moduleId))) return res.status(400).json({ message: "Invalid module ID" });
+
     const progressRepo = AppDataSource.getRepository(CourseProgress);
     const userRepo = AppDataSource.getRepository(User);
     const courseRepo = AppDataSource.getRepository(Course);
     const moduleRepo = AppDataSource.getRepository(Module);
 
-    const courseId = parseInt(req.params.id);
-    const course = await courseRepo.findOne({ where: { id: courseId }, relations: ["modules"] });
+    const course = await courseRepo.findOne({ where: { id }, relations: ["modules"] });
     if (!course) return res.status(404).json({ message: "Course not found" });
 
-    const module = await moduleRepo.findOneBy({ id: moduleId, course: { id: courseId } });
+    const module = await moduleRepo.findOneBy({ id: parseInt(moduleId), course: { id } });
     if (!module) return res.status(404).json({ message: "Module not found in this course" });
 
     let progress = await progressRepo.findOne({
       where: { 
         user: { id: req.user.id },
-        course: { id: courseId }
+        course: { id }
       }
     });
 
