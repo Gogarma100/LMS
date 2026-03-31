@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kokostream LMS</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://picsum.photos/seed/kokostream/192/192">
+</head>
+<body>
+    <nav id="navbar" class="hidden">
+        <div class="container">
+            <span class="logo">Kokostream</span>
+            <button id="logoutBtn">Logout</button>
+        </div>
+    </nav>
+
+    <main id="app-root" class="container">
+        <!-- Content will be injected here -->
+    </main>
+
+    <script src="app.js" type="module"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered', reg))
+                    .catch(err => console.log('SW failed', err));
+            });
+        }
+    </script>
+</body>
+</html>
