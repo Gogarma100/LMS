@@ -17,6 +17,7 @@ export const loginPage = (container, isRegister = false) => {
             </div>
             <button type="submit" id="submitBtn">${isRegister ? 'Register' : 'Login'}</button>
         </form>
+        ${!isRegister ? '<div style="text-align: center; margin-top: 1rem;"><a id="forgotPasswordLink" style="font-size: 0.875rem; color: #6366f1; cursor: pointer; text-decoration: none;">Forgot Password?</a></div>' : ''}
         <div class="toggle-auth">
             ${isRegister 
                 ? 'Already have an account? <a id="toggleLink">Login</a>' 
@@ -38,6 +39,11 @@ export const loginPage = (container, isRegister = false) => {
     };
 
     toggleLink.onclick = () => navigate(isRegister ? 'login' : 'register');
+
+    const forgotPasswordLink = div.querySelector('#forgotPasswordLink');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.onclick = () => navigate('forgot-password');
+    }
 
     form.onsubmit = async (e) => {
         e.preventDefault();

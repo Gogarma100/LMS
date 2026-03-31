@@ -3,6 +3,9 @@ import { dashboardPage } from './pages/dashboard.js';
 import { profilePage } from './pages/profile.js';
 import { certificatesPage } from './pages/certificates.js';
 import { usersPage } from './pages/users.js';
+import { courseViewPage } from './pages/courseView.js';
+import { forgotPasswordPage } from './pages/forgotPassword.js';
+import { resetPasswordPage } from './pages/resetPassword.js';
 
 const appRoot = document.getElementById('app-root');
 const navbar = document.getElementById('navbar');
@@ -13,7 +16,7 @@ let userSnapshot = null;
 export const navigate = async (page) => {
     const token = localStorage.getItem('accessToken');
     
-    if (!token && page !== 'login' && page !== 'register') {
+    if (!token && page !== 'login' && page !== 'register' && !page.startsWith('forgot-password') && !page.startsWith('reset-password')) {
         window.history.pushState({}, '', '/login');
         renderPage('login');
         return;
@@ -136,21 +139,36 @@ const updateNavbar = () => {
 const renderPage = (page) => {
     appRoot.innerHTML = '';
     
-    if (page === 'dashboard') {
+    // Handle routes with parameters (e.g., course?id=1)
+    const [pageName, queryString] = page.split('?');
+    const params = new URLSearchParams(queryString);
+
+    if (pageName === 'dashboard') {
         navbar.classList.remove('hidden');
         dashboardPage(appRoot);
-    } else if (page === 'profile') {
+    } else if (pageName === 'profile') {
         navbar.classList.remove('hidden');
         profilePage(appRoot);
-    } else if (page === 'certificates') {
+    } else if (pageName === 'certificates') {
         navbar.classList.remove('hidden');
         certificatesPage(appRoot);
-    } else if (page === 'users') {
+    } else if (pageName === 'users') {
         navbar.classList.remove('hidden');
         usersPage(appRoot);
+    } else if (pageName === 'course') {
+        navbar.classList.remove('hidden');
+        const courseId = params.get('id');
+        courseViewPage(appRoot, courseId);
+    } else if (pageName === 'forgot-password') {
+        navbar.classList.add('hidden');
+        forgotPasswordPage(appRoot);
+    } else if (pageName === 'reset-password') {
+        navbar.classList.add('hidden');
+        const token = params.get('token');
+        resetPasswordPage(appRoot, token);
     } else {
         navbar.classList.add('hidden');
-        loginPage(appRoot, page === 'register');
+        loginPage(appRoot, pageName === 'register');
     }
 };
 

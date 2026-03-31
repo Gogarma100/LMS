@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Entities ---
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToMany, ManyToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToMany, ManyToOne, MoreThan } from "typeorm";
 
 @Entity()
 class User {
@@ -27,6 +27,12 @@ class User {
   @Column({ type: "varchar", default: "user" })
   role!: string;
 
+  @Column({ type: "varchar", nullable: true })
+  resetToken!: string | null;
+
+  @Column({ type: "timestamp", nullable: true })
+  resetTokenExpiry!: Date | null;
+
   @ManyToMany(() => Course, (course) => course.users)
   courses!: Course[];
 
@@ -35,6 +41,27 @@ class User {
 
   @OneToMany(() => CourseProgress, (progress) => progress.user)
   progress!: CourseProgress[];
+}
+
+@Entity()
+class Review {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: "integer" })
+  rating!: number;
+
+  @Column({ type: "text", nullable: true })
+  comment!: string;
+
+  @ManyToOne(() => User)
+  user!: User;
+
+  @ManyToOne(() => Course, (course) => course.reviews)
+  course!: Course;
+
+  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  createdAt!: Date;
 }
 
 @Entity()
@@ -60,6 +87,9 @@ class Course {
 
   @OneToMany(() => Module, (module) => module.course, { cascade: true })
   modules!: Module[];
+
+  @OneToMany(() => Review, (review) => review.course)
+  reviews!: Review[];
 }
 
 @Entity()
@@ -104,7 +134,7 @@ const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   synchronize: true,
   logging: false,
-  entities: [User, Course, CourseProgress, Module],
+  entities: [User, Course, CourseProgress, Module, Review],
   ssl: process.env.DATABASE_URL?.includes("supabase.co") ? { rejectUnauthorized: false } : false,
 });
 
@@ -198,8 +228,56 @@ async function startServer() {
     const user = await userRepo.findOneBy({ id: req.user.id });
     if (!user) return res.status(404).json({ message: "User not found" });
     
-    const { password, ...userSnapshot } = user;
+    const { password, resetToken, resetTokenExpiry, ...userSnapshot } = user;
     res.json(userSnapshot);
+  });
+
+  app.post("/api/auth/request-reset", async (req, res) => {
+    const { email } = req.body;
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneBy({ email });
+
+    if (!user) {
+      // For security, don't reveal if user exists
+      return res.json({ message: "If an account with that email exists, a reset link has been sent." });
+    }
+
+    const crypto = await import("crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    user.resetToken = token;
+    user.resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+    await userRepo.save(user);
+
+    // In a real app, send email. Here we log it.
+    console.log(`Password reset token for ${email}: ${token}`);
+    console.log(`Reset link: ${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`);
+
+    res.json({ message: "If an account with that email exists, a reset link has been sent." });
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+    const userRepo = AppDataSource.getRepository(User);
+
+    const user = await userRepo.findOne({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: MoreThan(new Date())
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+
+    await userRepo.save(user);
+
+    res.json({ message: "Password has been reset successfully" });
   });
 
   app.put("/api/auth/me", authenticateToken, async (req: any, res: any) => {
@@ -226,7 +304,9 @@ async function startServer() {
 
   app.get("/api/courses", authenticateToken, async (req, res) => {
     const courseRepo = AppDataSource.getRepository(Course);
-    const courses = await courseRepo.find({ relations: ["modules", "instructor"] });
+    const courses = await courseRepo.find({ 
+      relations: ["modules", "instructor", "reviews", "reviews.user"] 
+    });
     res.json(courses);
   });
 
@@ -237,10 +317,63 @@ async function startServer() {
     const courseRepo = AppDataSource.getRepository(Course);
     const course = await courseRepo.findOne({
       where: { id },
-      relations: ["modules", "instructor"]
+      relations: ["modules", "instructor", "reviews", "reviews.user"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
     res.json(course);
+  });
+
+  app.post("/api/courses/:id/reviews", authenticateToken, async (req: any, res: any) => {
+    const id = parseInt(req.params.id);
+    const { rating, comment } = req.body;
+
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
+    if (isNaN(parseInt(rating)) || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const courseRepo = AppDataSource.getRepository(Course);
+    const userRepo = AppDataSource.getRepository(User);
+    const reviewRepo = AppDataSource.getRepository(Review);
+
+    const course = await courseRepo.findOne({ 
+      where: { id },
+      relations: ["users"]
+    });
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    // Check if user is enrolled
+    if (!course.users.some(u => u.id === req.user.id)) {
+      return res.status(403).json({ message: "Must be enrolled to leave a review" });
+    }
+
+    const user = await userRepo.findOneBy({ id: req.user.id });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Check if user already reviewed
+    const existingReview = await reviewRepo.findOne({
+      where: {
+        course: { id },
+        user: { id: user.id }
+      }
+    });
+
+    if (existingReview) {
+      existingReview.rating = rating;
+      existingReview.comment = comment;
+      await reviewRepo.save(existingReview);
+      return res.json(existingReview);
+    }
+
+    const review = reviewRepo.create({
+      rating,
+      comment,
+      user,
+      course
+    });
+
+    await reviewRepo.save(review);
+    res.json(review);
   });
 
   // Admin/Instructor Course Management
