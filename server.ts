@@ -94,11 +94,12 @@ class CourseProgress {
 
 // --- Database Setup ---
 const AppDataSource = new DataSource({
-  type: "sqlite",
-  database: "database.sqlite",
+  type: "postgres",
+  url: process.env.DATABASE_URL,
   synchronize: true,
   logging: false,
   entities: [User, Course, CourseProgress, Module],
+  ssl: process.env.DATABASE_URL?.includes("supabase.co") ? { rejectUnauthorized: false } : false,
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || "kokostream-secret";
