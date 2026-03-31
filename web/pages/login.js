@@ -5,6 +5,7 @@ export const loginPage = (container, isRegister = false) => {
     div.className = 'auth-container';
     div.innerHTML = `
         <h2>${isRegister ? 'Create Account' : 'Login to Kokostream'}</h2>
+        <div id="message" class="hidden"></div>
         <form id="authForm">
             <div class="form-group">
                 <label>Email</label>
@@ -14,7 +15,7 @@ export const loginPage = (container, isRegister = false) => {
                 <label>Password</label>
                 <input type="password" id="password" required placeholder="••••••••">
             </div>
-            <button type="submit">${isRegister ? 'Register' : 'Login'}</button>
+            <button type="submit" id="submitBtn">${isRegister ? 'Register' : 'Login'}</button>
         </form>
         <div class="toggle-auth">
             ${isRegister 
@@ -27,11 +28,23 @@ export const loginPage = (container, isRegister = false) => {
 
     const form = div.querySelector('#authForm');
     const toggleLink = div.querySelector('#toggleLink');
+    const messageDiv = div.querySelector('#message');
+    const submitBtn = div.querySelector('#submitBtn');
+
+    const showMessage = (text, type = 'error') => {
+        messageDiv.innerText = text;
+        messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+        messageDiv.classList.remove('hidden');
+    };
 
     toggleLink.onclick = () => navigate(isRegister ? 'login' : 'register');
 
     form.onsubmit = async (e) => {
         e.preventDefault();
+        messageDiv.classList.add('hidden');
+        submitBtn.disabled = true;
+        submitBtn.innerText = isRegister ? 'Registering...' : 'Logging in...';
+
         const email = div.querySelector('#email').value;
         const password = div.querySelector('#password').value;
 
@@ -48,19 +61,26 @@ export const loginPage = (container, isRegister = false) => {
 
             if (res.ok) {
                 if (isRegister) {
-                    alert('Registration successful! Please login.');
-                    navigate('login');
+                    showMessage('Registration successful! Redirecting to login...', 'success');
+                    setTimeout(() => navigate('login'), 1500);
                 } else {
                     localStorage.setItem('accessToken', data.accessToken);
                     localStorage.setItem('userRole', data.role);
-                    // The full snapshot will be fetched by app.js on navigation
                     navigate('dashboard');
                 }
             } else {
-                alert(data.message || 'Authentication failed');
+                if (res.status === 503) {
+                    showMessage('Database is initializing. Please wait a few seconds and try again.');
+                } else {
+                    showMessage(data.message || 'Authentication failed');
+                }
+                submitBtn.disabled = false;
+                submitBtn.innerText = isRegister ? 'Register' : 'Login';
             }
         } catch (err) {
-            alert('Server connection error');
+            showMessage('Server connection error. Please check if the backend is running.');
+            submitBtn.disabled = false;
+            submitBtn.innerText = isRegister ? 'Register' : 'Login';
         }
     };
 };
