@@ -15,10 +15,14 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg);
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(37, 99, 235, 0.05) 0px, transparent 50%);
     color: var(--text);
     line-height: 1.5;
+    min-height: 100vh;
 }
 
 .container {
@@ -35,10 +39,12 @@ body {
 nav {
     background: var(--card-bg);
     border-bottom: 1px solid var(--border);
-    padding: 0.5rem 0;
+    padding: 1rem 0;
     position: sticky;
     top: 0;
     z-index: 100;
+    backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.8);
 }
 
 nav .container {
@@ -49,23 +55,29 @@ nav .container {
 
 .logo {
     font-size: 1.5rem;
-    font-weight: bold;
+    font-weight: 800;
     color: var(--primary);
+    letter-spacing: -0.05em;
+    text-decoration: none;
 }
 
 /* Auth Form */
 .auth-container {
-    max-width: 400px;
-    margin: 4rem auto;
+    max-width: 420px;
+    margin: 6rem auto;
     background: var(--card-bg);
-    padding: 2rem;
-    border-radius: 0.75rem;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    padding: 2.5rem;
+    border-radius: 1.25rem;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.1);
+    border: 1px solid var(--border);
 }
 
 .auth-container h2 {
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
     text-align: center;
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
 }
 
 .form-group {
@@ -81,27 +93,50 @@ nav .container {
 
 input {
     width: 100%;
-    padding: 0.625rem;
+    padding: 0.75rem 1rem;
     border: 1px solid var(--border);
-    border-radius: 0.375rem;
+    border-radius: 0.625rem;
     font-size: 1rem;
+    transition: all 0.2s;
+    background: #f8fafc;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
 button {
     width: 100%;
-    padding: 0.625rem;
+    padding: 0.75rem 1.25rem;
     background: var(--primary);
     color: white;
     border: none;
-    border-radius: 0.375rem;
+    border-radius: 0.625rem;
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
 }
 
 button:hover {
     background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .toggle-auth {
@@ -124,32 +159,110 @@ button:hover {
 
 .course-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2rem;
 }
 
 .course-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    transition: transform 0.2s, box-shadow 0.2s;
+    border-radius: 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .course-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    border-color: var(--primary);
+}
+
+.course-card-content {
+    padding: 1.5rem;
+    flex-grow: 1;
 }
 
 .course-card h3 {
-    margin-bottom: 0.75rem;
-    color: var(--primary);
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 .course-card p {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
 }
+
+.course-card-footer {
+    padding: 1.25rem 1.5rem;
+    background: #f8fafc;
+    border-top: 1px solid var(--border);
+}
+
+.progress-bar-container {
+    background: #e2e8f0;
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-bar-fill {
+    background: linear-gradient(90deg, #10b981, #34d399);
+    height: 100%;
+    transition: width 0.5s ease-out;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    margin-bottom: 1rem;
+}
+
+.badge-enrolled {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.badge-admin {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.course-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    width: auto;
+    flex: 1;
+    min-width: 80px;
+    white-space: nowrap;
+}
+
+.btn-enroll { background: #10b981; }
+.btn-unenroll { background: #ef4444; }
+.btn-edit { background: #f59e0b; }
+.btn-delete { background: #dc2626; }
+.btn-view { background: #3b82f6; }
+.btn-progress { background: #6366f1; }
 
 .error-message {
     background: #fee2e2;
@@ -173,15 +286,19 @@ button:hover {
 
 #logoutBtn {
     width: auto;
-    padding: 0.5rem 1rem;
+    padding: 0.625rem 1.25rem;
     font-size: 0.875rem;
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
+    font-weight: 600;
+    background: #fee2e2;
+    color: #ef4444;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
 }
 
 #logoutBtn:hover {
-    background: #fee2e2;
-    color: #ef4444;
-    border-color: #fecaca;
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+    transform: scale(1.05);
 }

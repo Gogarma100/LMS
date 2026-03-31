@@ -55,18 +55,40 @@ const updateNavbar = () => {
         navbar.classList.remove('hidden');
         let userInfo = document.getElementById('user-info');
         if (!userInfo) {
-            userInfo = document.createElement('span');
+            userInfo = document.createElement('div');
             userInfo.id = 'user-info';
-            userInfo.style.fontSize = "0.875rem";
-            userInfo.style.color = "#64748b";
-            userInfo.style.marginRight = "1rem";
-            userInfo.style.cursor = "pointer";
-            userInfo.title = "View Profile";
-            userInfo.onclick = () => navigate('profile');
+            userInfo.style.display = 'flex';
+            userInfo.style.alignItems = 'center';
+            userInfo.style.gap = '1rem';
+            userInfo.style.marginRight = '1.5rem';
+            
+            const userDetails = document.createElement('div');
+            userDetails.style.textAlign = 'right';
+            userDetails.style.cursor = 'pointer';
+            userDetails.onclick = () => navigate('profile');
+            
+            const userEmail = document.createElement('div');
+            userEmail.style.fontSize = '0.875rem';
+            userEmail.style.fontWeight = '600';
+            userEmail.style.color = '#1e293b';
+            userEmail.id = 'nav-user-email';
+            
+            const userRole = document.createElement('div');
+            userRole.style.fontSize = '0.75rem';
+            userRole.style.color = '#64748b';
+            userRole.style.textTransform = 'uppercase';
+            userRole.style.letterSpacing = '0.025em';
+            userRole.id = 'nav-user-role';
+            
+            userDetails.appendChild(userEmail);
+            userDetails.appendChild(userRole);
+            userInfo.appendChild(userDetails);
+            
             const container = navbar.querySelector('.container');
             container.insertBefore(userInfo, logoutBtn);
         }
-        userInfo.innerText = `${userSnapshot.email} (${userSnapshot.role})`;
+        document.getElementById('nav-user-email').innerText = userSnapshot.email;
+        document.getElementById('nav-user-role').innerText = userSnapshot.role;
     } else {
         navbar.classList.add('hidden');
     }

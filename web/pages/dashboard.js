@@ -9,12 +9,12 @@ export const dashboardPage = async (container) => {
     const header = document.createElement('div');
     header.className = 'dashboard-header';
     header.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 2rem;">
             <div>
-                <h1>Welcome back!</h1>
-                <p class="text-muted">Explore your enrolled courses and continue learning.</p>
+                <h1 style="font-size: 2.5rem; font-weight: 800; color: #1e293b; letter-spacing: -0.05em; line-height: 1;">Learning Dashboard</h1>
+                <p style="color: #64748b; font-size: 1.125rem; margin-top: 0.5rem; font-weight: 500;">Track your progress and discover new skills.</p>
             </div>
-            ${role === 'admin' ? '<button id="addCourseBtn" style="width: auto; padding: 0.5rem 1rem;">+ Add Course</button>' : ''}
+            ${role === 'admin' ? '<button id="addCourseBtn" style="width: auto; padding: 0.875rem 1.75rem; background: #2563eb; color: white; border-radius: 0.75rem; font-weight: 700; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);">+ Create New Course</button>' : ''}
         </div>
     `;
     container.appendChild(header);
@@ -49,32 +49,39 @@ export const dashboardPage = async (container) => {
                     const progress = progressMap[course.id] || { percentageComplete: 0 };
                     return `
                         <div class="course-card" data-id="${course.id}">
-                            <h3>${course.title}</h3>
-                            <p>${course.description}</p>
-                            ${isEnrolled ? `
-                                <div class="progress-container" style="margin: 1rem 0;">
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
-                                        <span>Progress</span>
-                                        <span>${progress.percentageComplete}%</span>
+                            <div class="course-card-content">
+                                ${role === 'admin' ? '<span class="badge badge-admin">Admin Mode</span>' : (isEnrolled ? '<span class="badge badge-enrolled">Enrolled</span>' : '')}
+                                <h3>${course.title}</h3>
+                                <p>${course.description}</p>
+                                
+                                ${isEnrolled ? `
+                                    <div class="progress-section">
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; color: #64748b;">
+                                            <span>Course Progress</span>
+                                            <span>${progress.percentageComplete}%</span>
+                                        </div>
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar-fill" style="width: ${progress.percentageComplete}%;"></div>
+                                        </div>
                                     </div>
-                                    <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
-                                        <div style="background: #10b981; height: 100%; width: ${progress.percentageComplete}%; transition: width 0.3s ease;"></div>
-                                    </div>
+                                ` : ''}
+                            </div>
+                            
+                            <div class="course-card-footer">
+                                <div class="course-actions">
+                                    ${role === 'admin' ? `
+                                        <button class="edit-btn btn-small btn-edit">Edit</button>
+                                        <button class="delete-btn btn-small btn-delete">Delete</button>
+                                        <button class="view-users-btn btn-small btn-view">Users</button>
+                                    ` : `
+                                        <button class="enroll-btn btn-small ${isEnrolled ? 'btn-unenroll' : 'btn-enroll'}">
+                                            ${isEnrolled ? 'Unenroll' : 'Enroll Now'}
+                                        </button>
+                                        ${isEnrolled ? `
+                                            <button class="update-progress-btn btn-small btn-progress">Update</button>
+                                        ` : ''}
+                                    `}
                                 </div>
-                            ` : ''}
-                            <div class="course-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                ${role === 'admin' ? `
-                                    <button class="edit-btn" style="background: #f59e0b; font-size: 0.75rem; width: auto;">Edit</button>
-                                    <button class="delete-btn" style="background: #ef4444; font-size: 0.75rem; width: auto;">Delete</button>
-                                    <button class="view-users-btn" style="background: #3b82f6; font-size: 0.75rem; width: auto;">View Users</button>
-                                ` : `
-                                    <button class="enroll-btn" style="background: ${isEnrolled ? '#ef4444' : '#10b981'}; font-size: 0.75rem; width: auto;">
-                                        ${isEnrolled ? 'Unenroll' : 'Enroll Now'}
-                                    </button>
-                                    ${isEnrolled ? `
-                                        <button class="update-progress-btn" style="background: #6366f1; font-size: 0.75rem; width: auto;">Update Progress</button>
-                                    ` : ''}
-                                `}
                             </div>
                         </div>
                     `;
