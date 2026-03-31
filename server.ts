@@ -105,69 +105,29 @@ const AppDataSource = new DataSource({
 const JWT_SECRET = process.env.JWT_SECRET || "kokostream-secret";
 
 async function startServer() {
-  await AppDataSource.initialize();
-  console.log("Data Source has been initialized!");
-
-  // Seed data if empty
-  const courseRepo = AppDataSource.getRepository(Course);
-  const userRepo = AppDataSource.getRepository(User);
-  const moduleRepo = AppDataSource.getRepository(Module);
-
-  // Seed courses and modules
-  const courseCount = await courseRepo.count();
-  if (courseCount === 0) {
-    const courses = [
-      { 
-        title: "Introduction to Web Development", 
-        description: "Learn the basics of HTML, CSS, and JS.",
-        modules: [
-          { title: "HTML Basics", content: "Learn about tags, elements, and attributes.", order: 1 },
-          { title: "CSS Styling", content: "Learn about selectors, colors, and layout.", order: 2 },
-          { title: "JavaScript Fundamentals", content: "Learn about variables, functions, and loops.", order: 3 },
-        ]
-      },
-      { 
-        title: "Advanced React Patterns", 
-        description: "Master hooks, context, and performance.",
-        modules: [
-          { title: "Custom Hooks", content: "Learn how to build reusable logic.", order: 1 },
-          { title: "Context API", content: "Manage global state without prop drilling.", order: 2 },
-          { title: "Performance Optimization", content: "Use useMemo and useCallback effectively.", order: 3 },
-        ]
-      },
-      { 
-        title: "Node.js Backend Mastery", 
-        description: "Build scalable APIs with Express and TypeORM.",
-        modules: [
-          { title: "Express Middleware", content: "Understand how to process requests.", order: 1 },
-          { title: "Database Integration", content: "Connect to SQL databases with TypeORM.", order: 2 },
-          { title: "Authentication & Security", content: "Secure your API with JWT and bcrypt.", order: 3 },
-        ]
-      },
-    ];
-
-    for (const c of courses) {
-      const course = courseRepo.create(c);
-      await courseRepo.save(course);
-    }
-  }
-
-  // Seed Admin User
-  const adminEmail = "admin@kokostream.com";
-  const adminExists = await userRepo.findOneBy({ email: adminEmail });
-  if (!adminExists) {
-    const hashedPassword = await bcrypt.hash("admin123", 10);
-    await userRepo.save({
-      email: adminEmail,
-      password: hashedPassword,
-      role: "admin"
-    });
-    console.log("Admin user seeded: admin@kokostream.com / admin123");
-  }
-
   const app = express();
   app.use(cors());
   app.use(express.json());
+
+  // Health check endpoint for Cloud Run
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      db: AppDataSource.isInitialized,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Middleware to check DB readiness for API routes
+  app.use((req, res, next) => {
+    if (!AppDataSource.isInitialized && req.path.startsWith('/api') && req.path !== '/api/health') {
+      return res.status(503).json({ 
+        message: "Database is initializing. Please try again in a few seconds.",
+        retryAfter: 5
+      });
+    }
+    next();
+  });
 
   // --- Auth Middleware ---
   const authenticateToken = (req: any, res: any, next: any) => {
@@ -500,6 +460,77 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Kokostream Backend running on http://0.0.0.0:${PORT}`);
   });
+
+  // Initialize DB in the background to prevent startup timeout
+  try {
+    if (!process.env.DATABASE_URL) {
+      console.warn("DATABASE_URL is not set. Database features will not work.");
+    } else {
+      console.log("Initializing Data Source...");
+      await AppDataSource.initialize();
+      console.log("Data Source has been initialized!");
+
+      // Seed data if empty
+      const courseRepo = AppDataSource.getRepository(Course);
+      const userRepo = AppDataSource.getRepository(User);
+
+      // Seed courses and modules
+      const courseCount = await courseRepo.count();
+      if (courseCount === 0) {
+        const courses = [
+          { 
+            title: "Introduction to Web Development", 
+            description: "Learn the basics of HTML, CSS, and JS.",
+            modules: [
+              { title: "HTML Basics", content: "Learn about tags, elements, and attributes.", order: 1 },
+              { title: "CSS Styling", content: "Learn about selectors, colors, and layout.", order: 2 },
+              { title: "JavaScript Fundamentals", content: "Learn about variables, functions, and loops.", order: 3 },
+            ]
+          },
+          { 
+            title: "Advanced React Patterns", 
+            description: "Master hooks, context, and performance.",
+            modules: [
+              { title: "Custom Hooks", content: "Learn how to build reusable logic.", order: 1 },
+              { title: "Context API", content: "Manage global state without prop drilling.", order: 2 },
+              { title: "Performance Optimization", content: "Use useMemo and useCallback effectively.", order: 3 },
+            ]
+          },
+          { 
+            title: "Node.js Backend Mastery", 
+            description: "Build scalable APIs with Express and TypeORM.",
+            modules: [
+              { title: "Express Middleware", content: "Understand how to process requests.", order: 1 },
+              { title: "Database Integration", content: "Connect to SQL databases with TypeORM.", order: 2 },
+              { title: "Authentication & Security", content: "Secure your API with JWT and bcrypt.", order: 3 },
+            ]
+          },
+        ];
+
+        for (const c of courses) {
+          const course = courseRepo.create(c);
+          await courseRepo.save(course);
+        }
+        console.log("Courses seeded.");
+      }
+
+      // Seed Admin User
+      const adminEmail = "admin@kokostream.com";
+      const adminExists = await userRepo.findOneBy({ email: adminEmail });
+      if (!adminExists) {
+        const hashedPassword = await bcrypt.hash("admin123", 10);
+        await userRepo.save({
+          email: adminEmail,
+          password: hashedPassword,
+          role: "admin"
+        });
+        console.log("Admin user seeded: admin@kokostream.com / admin123");
+      }
+    }
+  } catch (err) {
+    console.error("Error during Data Source initialization:", err);
+    console.warn("Server is running but database features are unavailable.");
+  }
 }
 
 startServer().catch((err) => console.error(err));
