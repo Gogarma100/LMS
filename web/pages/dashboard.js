@@ -14,7 +14,7 @@ export const dashboardPage = async (container) => {
                 <h1 style="font-size: 2.5rem; font-weight: 800; color: #1e293b; letter-spacing: -0.05em; line-height: 1;">Learning Dashboard</h1>
                 <p style="color: #64748b; font-size: 1.125rem; margin-top: 0.5rem; font-weight: 500;">Track your progress and discover new skills.</p>
             </div>
-            ${role === 'admin' ? '<button id="addCourseBtn" style="width: auto; padding: 0.875rem 1.75rem; background: #2563eb; color: white; border-radius: 0.75rem; font-weight: 700; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);">+ Create New Course</button>' : ''}
+            ${(role === 'admin' || role === 'instructor') ? '<button id="addCourseBtn" style="width: auto; padding: 0.875rem 1.75rem; background: #2563eb; color: white; border-radius: 0.75rem; font-weight: 700; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);">+ Create New Course</button>' : ''}
         </div>
     `;
     container.appendChild(header);
@@ -50,7 +50,7 @@ export const dashboardPage = async (container) => {
                     return `
                         <div class="course-card" data-id="${course.id}">
                             <div class="course-card-content">
-                                ${role === 'admin' ? '<span class="badge badge-admin">Admin Mode</span>' : (isEnrolled ? '<span class="badge badge-enrolled">Enrolled</span>' : '')}
+                                ${(role === 'admin' || role === 'instructor') ? `<span class="badge badge-admin">${role.toUpperCase()} MODE</span>` : (isEnrolled ? '<span class="badge badge-enrolled">Enrolled</span>' : '')}
                                 <h3>${course.title}</h3>
                                 <p>${course.description}</p>
                                 
@@ -69,18 +69,21 @@ export const dashboardPage = async (container) => {
                             
                             <div class="course-card-footer">
                                 <div class="course-actions">
-                                    ${role === 'admin' ? `
+                                    ${(role === 'admin' || role === 'instructor') ? `
                                         <button class="edit-btn btn-small btn-edit">Edit</button>
+                                    ` : ''}
+                                    ${role === 'admin' ? `
                                         <button class="delete-btn btn-small btn-delete">Delete</button>
                                         <button class="view-users-btn btn-small btn-view">Users</button>
-                                    ` : `
+                                    ` : ''}
+                                    ${role === 'user' || (role === 'instructor' && !isEnrolled) ? `
                                         <button class="enroll-btn btn-small ${isEnrolled ? 'btn-unenroll' : 'btn-enroll'}">
                                             ${isEnrolled ? 'Unenroll' : 'Enroll Now'}
                                         </button>
-                                        ${isEnrolled ? `
-                                            <button class="update-progress-btn btn-small btn-progress">Update</button>
-                                        ` : ''}
-                                    `}
+                                    ` : ''}
+                                    ${isEnrolled ? `
+                                        <button class="update-progress-btn btn-small btn-progress">Update</button>
+                                    ` : ''}
                                 </div>
                             </div>
                         </div>
@@ -115,20 +118,7 @@ export const dashboardPage = async (container) => {
                     };
                 });
 
-                if (role === 'admin') {
-                    grid.querySelectorAll('.delete-btn').forEach(btn => {
-                        btn.onclick = async (e) => {
-                            const id = e.target.closest('.course-card').dataset.id;
-                            if (confirm('Are you sure you want to delete this course?')) {
-                                const delRes = await fetch(`/api/courses/${id}`, {
-                                    method: 'DELETE',
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                });
-                                if (delRes.ok) fetchCourses();
-                            }
-                        };
-                    });
-
+                if (role === 'admin' || role === 'instructor') {
                     grid.querySelectorAll('.edit-btn').forEach(btn => {
                         btn.onclick = (e) => {
                             const card = e.target.closest('.course-card');
@@ -139,12 +129,27 @@ export const dashboardPage = async (container) => {
                         };
                     });
 
-                    grid.querySelectorAll('.view-users-btn').forEach(btn => {
-                        btn.onclick = async (e) => {
-                            const id = e.target.closest('.course-card').dataset.id;
-                            showEnrolledUsersModal(id, token);
-                        };
-                    });
+                    if (role === 'admin') {
+                        grid.querySelectorAll('.delete-btn').forEach(btn => {
+                            btn.onclick = async (e) => {
+                                const id = e.target.closest('.course-card').dataset.id;
+                                if (confirm('Are you sure you want to delete this course?')) {
+                                    const delRes = await fetch(`/api/courses/${id}`, {
+                                        method: 'DELETE',
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    });
+                                    if (delRes.ok) fetchCourses();
+                                }
+                            };
+                        });
+
+                        grid.querySelectorAll('.view-users-btn').forEach(btn => {
+                            btn.onclick = async (e) => {
+                                const id = e.target.closest('.course-card').dataset.id;
+                                showEnrolledUsersModal(id, token);
+                            };
+                        });
+                    }
                 }
             } else {
                 grid.innerHTML = '<p>Failed to load courses. Please login again.</p>';
@@ -154,7 +159,7 @@ export const dashboardPage = async (container) => {
         }
     };
 
-    if (role === 'admin') {
+    if (role === 'admin' || role === 'instructor') {
         const addBtn = header.querySelector('#addCourseBtn');
         if (addBtn) addBtn.onclick = () => showCourseModal(null, token, fetchCourses);
     }

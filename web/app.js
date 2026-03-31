@@ -1,6 +1,7 @@
 import { loginPage } from './pages/login.js';
 import { dashboardPage } from './pages/dashboard.js';
 import { profilePage } from './pages/profile.js';
+import { certificatesPage } from './pages/certificates.js';
 
 const appRoot = document.getElementById('app-root');
 const navbar = document.getElementById('navbar');
@@ -67,6 +68,31 @@ const updateNavbar = () => {
             userDetails.style.cursor = 'pointer';
             userDetails.onclick = () => navigate('profile');
             
+            const navLinks = document.createElement('div');
+            navLinks.style.display = 'flex';
+            navLinks.style.gap = '1.5rem';
+            navLinks.style.marginRight = '2rem';
+            navLinks.style.alignItems = 'center';
+            
+            const dashboardLink = document.createElement('a');
+            dashboardLink.innerText = 'Dashboard';
+            dashboardLink.style.fontSize = '0.875rem';
+            dashboardLink.style.fontWeight = '600';
+            dashboardLink.style.color = '#64748b';
+            dashboardLink.style.cursor = 'pointer';
+            dashboardLink.onclick = () => navigate('dashboard');
+            
+            const certsLink = document.createElement('a');
+            certsLink.innerText = 'My Certificates';
+            certsLink.style.fontSize = '0.875rem';
+            certsLink.style.fontWeight = '600';
+            certsLink.style.color = '#64748b';
+            certsLink.style.cursor = 'pointer';
+            certsLink.onclick = () => navigate('certificates');
+            
+            navLinks.appendChild(dashboardLink);
+            navLinks.appendChild(certsLink);
+            
             const userEmail = document.createElement('div');
             userEmail.style.fontSize = '0.875rem';
             userEmail.style.fontWeight = '600';
@@ -82,6 +108,7 @@ const updateNavbar = () => {
             
             userDetails.appendChild(userEmail);
             userDetails.appendChild(userRole);
+            userInfo.appendChild(navLinks);
             userInfo.appendChild(userDetails);
             
             const container = navbar.querySelector('.container');
@@ -103,6 +130,9 @@ const renderPage = (page) => {
     } else if (page === 'profile') {
         navbar.classList.remove('hidden');
         profilePage(appRoot);
+    } else if (page === 'certificates') {
+        navbar.classList.remove('hidden');
+        certificatesPage(appRoot);
     } else {
         navbar.classList.add('hidden');
         loginPage(appRoot, page === 'register');

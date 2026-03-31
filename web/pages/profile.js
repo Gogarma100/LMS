@@ -1,4 +1,5 @@
 import { navigate } from '../app.js';
+import { generateCertificate } from '../services/CertificateService.js';
 
 export const profilePage = (container) => {
     const token = localStorage.getItem('accessToken');
@@ -6,7 +7,7 @@ export const profilePage = (container) => {
     const div = document.createElement('div');
     div.className = 'profile-container';
     div.innerHTML = `
-        <div class="auth-container" style="max-width: 500px; margin: 4rem auto;">
+        <div class="auth-container" style="max-width: 600px; margin: 4rem auto;">
             <h2 style="text-align: left; margin-bottom: 2rem;">User Profile</h2>
             <div id="profileMessage" class="hidden"></div>
             <form id="profileForm">
@@ -18,6 +19,7 @@ export const profilePage = (container) => {
                     <label>User Role</label>
                     <select id="profileRole" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 0.625rem; font-size: 1rem; background: #f8fafc; cursor: pointer;">
                         <option value="user">User</option>
+                        <option value="instructor">Instructor</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
@@ -26,6 +28,13 @@ export const profilePage = (container) => {
                     <button type="button" id="backBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; box-shadow: none;">Back to Dashboard</button>
                 </div>
             </form>
+
+            <div id="certificatesSection" style="margin-top: 4rem; border-top: 2px solid #e2e8f0; padding-top: 2rem;">
+                <h3 style="font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-bottom: 1.5rem;">My Certificates</h3>
+                <div id="certificatesList" class="certificates-list">
+                    <p style="color: #64748b;">Loading certificates...</p>
+                </div>
+            </div>
         </div>
     `;
 
@@ -37,6 +46,7 @@ export const profilePage = (container) => {
     const backBtn = div.querySelector('#backBtn');
     const saveBtn = div.querySelector('#saveBtn');
     const messageDiv = div.querySelector('#profileMessage');
+    const certificatesList = div.querySelector('#certificatesList');
 
     const showMessage = (text, type = 'error') => {
         messageDiv.innerText = text;
@@ -46,18 +56,48 @@ export const profilePage = (container) => {
 
     backBtn.onclick = () => navigate('dashboard');
 
-    const fetchProfile = async () => {
+    const fetchProfileData = async () => {
         try {
-            const res = await fetch('/api/auth/me', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const user = await res.json();
+            const [profileRes, progressRes] = await Promise.all([
+                fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch('/api/courses/progress', { headers: { 'Authorization': `Bearer ${token}` } })
+            ]);
+
+            if (profileRes.ok) {
+                const user = await profileRes.json();
                 emailInput.value = user.email;
                 roleSelect.value = user.role;
+
+                if (progressRes.ok) {
+                    const progressList = await progressRes.json();
+                    const completedCourses = progressList.filter(p => p.percentageComplete === 100);
+
+                    if (completedCourses.length > 0) {
+                        certificatesList.innerHTML = completedCourses.map(p => `
+                            <div class="certificate-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin-bottom: 1rem;">
+                                <div>
+                                    <h4 style="font-weight: 700; color: #1e293b;">${p.course.title}</h4>
+                                    <p style="font-size: 0.875rem; color: #64748b;">Completed on ${new Date(p.updatedAt).toLocaleDateString()}</p>
+                                </div>
+                                <button class="download-cert-btn btn-small" data-course="${p.course.title}" data-date="${new Date(p.updatedAt).toLocaleDateString()}" style="width: auto; background: #2563eb; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600;">
+                                    Download PDF
+                                </button>
+                            </div>
+                        `).join('');
+
+                        certificatesList.querySelectorAll('.download-cert-btn').forEach(btn => {
+                            btn.onclick = () => {
+                                generateCertificate(emailInput.value, btn.dataset.course, btn.dataset.date);
+                            };
+                        });
+                    } else {
+                        certificatesList.innerHTML = '<p style="color: #64748b;">Complete a course to earn your first certificate!</p>';
+                    }
+                }
             }
         } catch (err) {
-            console.error('Failed to fetch profile', err);
+            console.error('Failed to fetch profile data', err);
+            certificatesList.innerHTML = '<p style="color: #ef4444;">Error loading certificates.</p>';
         }
     };
 
@@ -96,5 +136,5 @@ export const profilePage = (container) => {
         }
     };
 
-    fetchProfile();
+    fetchProfileData();
 };

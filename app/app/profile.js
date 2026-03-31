@@ -70,7 +70,7 @@ export default function ProfileScreen() {
           style={styles.input}
           value={role}
           onChangeText={setRole}
-          placeholder="user or admin"
+          placeholder="user, instructor, or admin"
           autoCapitalize="none"
         />
 

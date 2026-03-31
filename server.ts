@@ -151,6 +151,14 @@ async function startServer() {
     }
   };
 
+  const isInstructorOrAdmin = (req: any, res: any, next: any) => {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'instructor')) {
+      next();
+    } else {
+      res.status(403).json({ message: "Instructor or Admin access required" });
+    }
+  };
+
   // --- API Routes ---
   app.post("/api/auth/register", async (req, res) => {
     const { email, password } = req.body;
@@ -223,8 +231,8 @@ async function startServer() {
     res.json(course);
   });
 
-  // Admin Course Management
-  app.post("/api/courses", authenticateToken, isAdmin, async (req, res) => {
+  // Admin/Instructor Course Management
+  app.post("/api/courses", authenticateToken, isInstructorOrAdmin, async (req, res) => {
     const { title, description } = req.body;
     const courseRepo = AppDataSource.getRepository(Course);
     const course = courseRepo.create({ title, description });
@@ -232,7 +240,7 @@ async function startServer() {
     res.status(201).json(course);
   });
 
-  app.put("/api/courses/:id", authenticateToken, isAdmin, async (req, res) => {
+  app.put("/api/courses/:id", authenticateToken, isInstructorOrAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid course ID" });
 
