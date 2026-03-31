@@ -242,6 +242,12 @@ button:disabled {
     color: #d97706;
 }
 
+.badge-teaching {
+    background: #e0e7ff;
+    color: #6366f1;
+    border: 1px solid #c7d2fe;
+}
+
 .course-actions {
     display: flex;
     gap: 0.75rem;

@@ -17,11 +17,12 @@ export const profilePage = (container) => {
                 </div>
                 <div class="form-group">
                     <label>User Role</label>
-                    <select id="profileRole" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 0.625rem; font-size: 1rem; background: #f8fafc; cursor: pointer;">
+                    <select id="profileRole" ${localStorage.getItem('userRole') !== 'admin' ? 'disabled' : ''} style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 0.625rem; font-size: 1rem; background: ${localStorage.getItem('userRole') !== 'admin' ? '#f1f5f9' : '#f8fafc'}; cursor: ${localStorage.getItem('userRole') !== 'admin' ? 'not-allowed' : 'pointer'};">
                         <option value="user">User</option>
                         <option value="instructor">Instructor</option>
                         <option value="admin">Admin</option>
                     </select>
+                    ${localStorage.getItem('userRole') !== 'admin' ? '<p style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">Only administrators can change user roles.</p>' : ''}
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 2.5rem;">
                     <button type="submit" id="saveBtn">Save Profile Changes</button>

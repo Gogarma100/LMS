@@ -20,37 +20,51 @@ export const dashboardPage = async (container) => {
     container.appendChild(header);
 
     const grid = document.createElement('div');
-    grid.className = 'course-grid';
+    grid.className = 'dashboard-content';
     grid.innerHTML = '<p>Loading courses...</p>';
     container.appendChild(grid);
 
     const fetchCourses = async () => {
         try {
-            // Fetch all courses, user's enrolled courses, and progress
-            const [coursesRes, enrolledRes, progressRes] = await Promise.all([
+            // Fetch all courses, user's enrolled courses, progress, and teaching courses
+            const requests = [
                 fetch('/api/courses', { headers: { 'Authorization': `Bearer ${token}` } }),
                 fetch('/api/auth/me/courses', { headers: { 'Authorization': `Bearer ${token}` } }),
                 fetch('/api/courses/progress', { headers: { 'Authorization': `Bearer ${token}` } })
-            ]);
+            ];
 
-            if (coursesRes.ok && enrolledRes.ok && progressRes.ok) {
-                const courses = await coursesRes.json();
-                const enrolledCourses = await enrolledRes.json();
-                const progressList = await progressRes.json();
+            if (role === 'instructor') {
+                requests.push(fetch('/api/auth/me/teaching', { headers: { 'Authorization': `Bearer ${token}` } }));
+            }
+
+            const responses = await Promise.all(requests);
+            
+            if (responses.every(res => res.ok)) {
+                const courses = await responses[0].json();
+                const enrolledCourses = await responses[1].json();
+                const progressList = await responses[2].json();
+                const teachingCourses = role === 'instructor' ? await responses[3].json() : [];
 
                 const enrolledIds = enrolledCourses.map(c => c.id);
+                const teachingIds = teachingCourses.map(c => c.id);
                 const progressMap = progressList.reduce((acc, p) => {
                     acc[p.course.id] = p;
                     return acc;
                 }, {});
 
-                grid.innerHTML = courses.map(course => {
+                const renderCourseCard = (course) => {
                     const isEnrolled = enrolledIds.includes(course.id);
+                    const isTeaching = teachingIds.includes(course.id);
                     const progress = progressMap[course.id] || { percentageComplete: 0 };
+                    
                     return `
-                        <div class="course-card" data-id="${course.id}">
+                        <div class="course-card" data-id="${course.id}" style="${isTeaching ? 'border-top: 4px solid #6366f1;' : ''}">
                             <div class="course-card-content">
-                                ${(role === 'admin' || role === 'instructor') ? `<span class="badge badge-admin">${role.toUpperCase()} MODE</span>` : (isEnrolled ? '<span class="badge badge-enrolled">Enrolled</span>' : '')}
+                                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                    ${isTeaching ? '<span class="badge badge-teaching">TEACHING</span>' : ''}
+                                    ${isEnrolled ? '<span class="badge badge-enrolled">ENROLLED</span>' : ''}
+                                    ${role === 'admin' ? '<span class="badge badge-admin">ADMIN</span>' : ''}
+                                </div>
                                 <h3>${course.title}</h3>
                                 <p>${course.description}</p>
                                 
@@ -69,14 +83,14 @@ export const dashboardPage = async (container) => {
                             
                             <div class="course-card-footer">
                                 <div class="course-actions">
-                                    ${(role === 'admin' || role === 'instructor') ? `
+                                    ${(role === 'admin' || isTeaching) ? `
                                         <button class="edit-btn btn-small btn-edit">Edit</button>
                                     ` : ''}
                                     ${role === 'admin' ? `
                                         <button class="delete-btn btn-small btn-delete">Delete</button>
                                         <button class="view-users-btn btn-small btn-view">Users</button>
                                     ` : ''}
-                                    ${role === 'user' || (role === 'instructor' && !isEnrolled) ? `
+                                    ${!isTeaching ? `
                                         <button class="enroll-btn btn-small ${isEnrolled ? 'btn-unenroll' : 'btn-enroll'}">
                                             ${isEnrolled ? 'Unenroll' : 'Enroll Now'}
                                         </button>
@@ -88,7 +102,55 @@ export const dashboardPage = async (container) => {
                             </div>
                         </div>
                     `;
-                }).join('');
+                };
+
+                let html = '';
+
+                if (role === 'instructor' && teachingCourses.length > 0) {
+                    html += `
+                        <section style="margin-bottom: 3rem;">
+                            <h2 style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="width: 8px; height: 24px; background: #6366f1; border-radius: 4px;"></span>
+                                Courses You're Teaching
+                            </h2>
+                            <div class="course-grid">
+                                ${teachingCourses.map(renderCourseCard).join('')}
+                            </div>
+                        </section>
+                    `;
+                }
+
+                const enrolledList = courses.filter(c => enrolledIds.includes(c.id));
+                if (enrolledList.length > 0) {
+                    html += `
+                        <section style="margin-bottom: 3rem;">
+                            <h2 style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="width: 8px; height: 24px; background: #10b981; border-radius: 4px;"></span>
+                                Your Learning Journey
+                            </h2>
+                            <div class="course-grid">
+                                ${enrolledList.map(renderCourseCard).join('')}
+                            </div>
+                        </section>
+                    `;
+                }
+
+                const availableList = courses.filter(c => !enrolledIds.includes(c.id) && !teachingIds.includes(c.id));
+                if (availableList.length > 0 || (enrolledList.length === 0 && teachingCourses.length === 0)) {
+                    html += `
+                        <section>
+                            <h2 style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="width: 8px; height: 24px; background: #2563eb; border-radius: 4px;"></span>
+                                Explore New Courses
+                            </h2>
+                            <div class="course-grid">
+                                ${availableList.length > 0 ? availableList.map(renderCourseCard).join('') : '<p style="color: #64748b; padding: 2rem; text-align: center; background: white; border-radius: 1rem; border: 1px dashed var(--border); width: 100%;">No other courses available at the moment.</p>'}
+                            </div>
+                        </section>
+                    `;
+                }
+
+                grid.innerHTML = html;
 
                 // Event Listeners
                 grid.querySelectorAll('.enroll-btn').forEach(btn => {
@@ -120,12 +182,25 @@ export const dashboardPage = async (container) => {
 
                 if (role === 'admin' || role === 'instructor') {
                     grid.querySelectorAll('.edit-btn').forEach(btn => {
-                        btn.onclick = (e) => {
+                        btn.onclick = async (e) => {
                             const card = e.target.closest('.course-card');
                             const id = card.dataset.id;
-                            const title = card.querySelector('h3').innerText;
-                            const desc = card.querySelector('p').innerText;
-                            showCourseModal({ id, title, description: desc }, token, fetchCourses);
+                            
+                            // Fetch full course details including modules
+                            try {
+                                const res = await fetch(`/api/courses/${id}`, {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (res.ok) {
+                                    const fullCourse = await res.json();
+                                    showCourseModal(fullCourse, token, fetchCourses);
+                                } else {
+                                    alert('Failed to fetch course details');
+                                }
+                            } catch (err) {
+                                console.error('Error fetching course details', err);
+                                alert('Error connecting to server');
+                            }
                         };
                     });
 

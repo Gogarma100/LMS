@@ -6,6 +6,7 @@ import api from '../services/api';
 export default function ProfileScreen() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
+  const [userRole, setUserRole] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function ProfileScreen() {
       const res = await api.get('/api/auth/me');
       setEmail(res.data.email);
       setRole(res.data.role);
+      setUserRole(res.data.role);
     } catch (err) {
       console.error('Failed to fetch profile', err);
       Alert.alert('Error', 'Failed to load profile');
@@ -67,12 +69,16 @@ export default function ProfileScreen() {
 
         <Text style={styles.label}>Role</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, role !== 'admin' && userRole !== 'admin' && styles.disabledInput]}
           value={role}
           onChangeText={setRole}
           placeholder="user, instructor, or admin"
           autoCapitalize="none"
+          editable={userRole === 'admin'}
         />
+        {userRole !== 'admin' && (
+          <Text style={styles.helperText}>Only administrators can change user roles.</Text>
+        )}
 
         <TouchableOpacity 
           style={[styles.saveButton, saving && styles.disabledButton]} 
@@ -94,6 +100,8 @@ const styles = StyleSheet.create({
   form: { padding: 20 },
   label: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, marginBottom: 20, fontSize: 16 },
+  disabledInput: { backgroundColor: '#f1f5f9', color: '#64748b' },
+  helperText: { fontSize: 12, color: '#64748b', marginTop: -15, marginBottom: 20 },
   saveButton: { backgroundColor: '#2563eb', padding: 15, borderRadius: 8, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   disabledButton: { opacity: 0.7 },

@@ -30,6 +30,9 @@ class User {
   @ManyToMany(() => Course, (course) => course.users)
   courses!: Course[];
 
+  @OneToMany(() => Course, (course) => course.instructor)
+  taughtCourses!: Course[];
+
   @OneToMany(() => CourseProgress, (progress) => progress.user)
   progress!: CourseProgress[];
 }
@@ -48,6 +51,9 @@ class Course {
   @ManyToMany(() => User, (user) => user.courses)
   @JoinTable()
   users!: User[];
+
+  @ManyToOne(() => User, (user) => user.taughtCourses)
+  instructor!: User;
 
   @OneToMany(() => CourseProgress, (progress) => progress.course)
   progress!: CourseProgress[];
@@ -203,9 +209,15 @@ async function startServer() {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (email) user.email = email;
-    // Only allow role update if the user is an admin OR if we want to allow users to change their own role (usually not recommended, but requested)
-    // For this demo, let's allow it as requested "edit their information (email, role, etc.)"
-    if (role) user.role = role;
+    
+    // Only allow role update if the requester is an admin
+    if (role && role !== user.role) {
+      if (req.user.role === 'admin') {
+        user.role = role;
+      } else {
+        return res.status(403).json({ message: "Only admins can change user roles" });
+      }
+    }
 
     await userRepo.save(user);
     const { password: _, ...updatedUser } = user;
@@ -214,7 +226,7 @@ async function startServer() {
 
   app.get("/api/courses", authenticateToken, async (req, res) => {
     const courseRepo = AppDataSource.getRepository(Course);
-    const courses = await courseRepo.find({ relations: ["modules"] });
+    const courses = await courseRepo.find({ relations: ["modules", "instructor"] });
     res.json(courses);
   });
 
@@ -225,17 +237,21 @@ async function startServer() {
     const courseRepo = AppDataSource.getRepository(Course);
     const course = await courseRepo.findOne({
       where: { id },
-      relations: ["modules"]
+      relations: ["modules", "instructor"]
     });
     if (!course) return res.status(404).json({ message: "Course not found" });
     res.json(course);
   });
 
   // Admin/Instructor Course Management
-  app.post("/api/courses", authenticateToken, isInstructorOrAdmin, async (req, res) => {
+  app.post("/api/courses", authenticateToken, isInstructorOrAdmin, async (req: any, res: any) => {
     const { title, description } = req.body;
     const courseRepo = AppDataSource.getRepository(Course);
-    const course = courseRepo.create({ title, description });
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneBy({ id: req.user.id });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const course = courseRepo.create({ title, description, instructor: user });
     await courseRepo.save(course);
     res.status(201).json(course);
   });
@@ -345,6 +361,36 @@ async function startServer() {
     });
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user.courses);
+  });
+
+  app.get("/api/auth/me/teaching", authenticateToken, async (req: any, res: any) => {
+    const courseRepo = AppDataSource.getRepository(Course);
+    const courses = await courseRepo.find({
+      where: { instructor: { id: req.user.id } },
+      relations: ["modules"]
+    });
+    res.json(courses);
+  });
+
+  // --- Admin User Management ---
+  app.get("/api/admin/users", authenticateToken, isAdmin, async (req, res) => {
+    const userRepo = AppDataSource.getRepository(User);
+    const users = await userRepo.find({
+      select: ["id", "email", "role"]
+    });
+    res.json(users);
+  });
+
+  app.put("/api/admin/users/:id/role", authenticateToken, isAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { role } = req.body;
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneBy({ id });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    
+    user.role = role;
+    await userRepo.save(user);
+    res.json({ id: user.id, email: user.email, role: user.role });
   });
 
   // --- Progress Tracking Endpoints ---

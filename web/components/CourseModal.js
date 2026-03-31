@@ -1,3 +1,5 @@
+import { showCoursePreviewModal } from './CoursePreviewModal.js';
+
 export const showCourseModal = (course = null, token, onSuccess) => {
     let modules = course ? (course.modules || []) : [];
 
@@ -28,6 +30,7 @@ export const showCourseModal = (course = null, token, onSuccess) => {
 
                 <div style="display: flex; gap: 1rem; margin-top: 2rem;">
                     <button type="submit">Save Course</button>
+                    <button type="button" id="previewCourseBtn" style="background: #6366f1;">Preview Course</button>
                     <button type="button" id="closeModal" style="background: #64748b;">Cancel</button>
                 </div>
             </form>
@@ -36,6 +39,17 @@ export const showCourseModal = (course = null, token, onSuccess) => {
     document.body.appendChild(modal);
 
     const moduleInputsDiv = modal.querySelector('#moduleInputs');
+
+    const updateModulesFromInputs = () => {
+        const modTitles = Array.from(moduleInputsDiv.querySelectorAll('.mod-title'));
+        const modContents = Array.from(moduleInputsDiv.querySelectorAll('.mod-content'));
+        
+        modules = modules.map((mod, i) => ({
+            ...mod,
+            title: modTitles[i] ? modTitles[i].value : mod.title,
+            content: modContents[i] ? modContents[i].value : mod.content
+        }));
+    };
 
     const renderModules = () => {
         moduleInputsDiv.innerHTML = modules.map((mod, index) => `
@@ -52,6 +66,7 @@ export const showCourseModal = (course = null, token, onSuccess) => {
 
         moduleInputsDiv.querySelectorAll('.remove-module').forEach(btn => {
             btn.onclick = () => {
+                updateModulesFromInputs();
                 modules.splice(parseInt(btn.dataset.index), 1);
                 renderModules();
             };
@@ -61,22 +76,31 @@ export const showCourseModal = (course = null, token, onSuccess) => {
     renderModules();
 
     modal.querySelector('#addModuleBtn').onclick = () => {
+        updateModulesFromInputs();
         modules.push({ title: '', content: '', order: modules.length + 1 });
         renderModules();
+    };
+
+    modal.querySelector('#previewCourseBtn').onclick = () => {
+        updateModulesFromInputs();
+        const title = modal.querySelector('#m-title').value;
+        const description = modal.querySelector('#m-desc').value;
+        
+        showCoursePreviewModal({
+            title,
+            description,
+            modules: modules.map((mod, i) => ({ ...mod, order: i + 1 }))
+        });
     };
 
     modal.querySelector('#closeModal').onclick = () => modal.remove();
     modal.querySelector('#courseForm').onsubmit = async (e) => {
         e.preventDefault();
         
-        // Get latest module values
-        const modTitles = Array.from(moduleInputsDiv.querySelectorAll('.mod-title')).map(el => el.value);
-        const modContents = Array.from(moduleInputsDiv.querySelectorAll('.mod-content')).map(el => el.value);
+        updateModulesFromInputs();
         
         const finalModules = modules.map((mod, i) => ({
             ...mod,
-            title: modTitles[i],
-            content: modContents[i],
             order: i + 1
         }));
 

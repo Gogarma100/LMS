@@ -2,6 +2,7 @@ import { loginPage } from './pages/login.js';
 import { dashboardPage } from './pages/dashboard.js';
 import { profilePage } from './pages/profile.js';
 import { certificatesPage } from './pages/certificates.js';
+import { usersPage } from './pages/users.js';
 
 const appRoot = document.getElementById('app-root');
 const navbar = document.getElementById('navbar');
@@ -92,6 +93,17 @@ const updateNavbar = () => {
             
             navLinks.appendChild(dashboardLink);
             navLinks.appendChild(certsLink);
+
+            if (userSnapshot.role === 'admin') {
+                const usersLink = document.createElement('a');
+                usersLink.innerText = 'Manage Users';
+                usersLink.style.fontSize = '0.875rem';
+                usersLink.style.fontWeight = '600';
+                usersLink.style.color = '#6366f1';
+                usersLink.style.cursor = 'pointer';
+                usersLink.onclick = () => navigate('users');
+                navLinks.appendChild(usersLink);
+            }
             
             const userEmail = document.createElement('div');
             userEmail.style.fontSize = '0.875rem';
@@ -133,6 +145,9 @@ const renderPage = (page) => {
     } else if (page === 'certificates') {
         navbar.classList.remove('hidden');
         certificatesPage(appRoot);
+    } else if (page === 'users') {
+        navbar.classList.remove('hidden');
+        usersPage(appRoot);
     } else {
         navbar.classList.add('hidden');
         loginPage(appRoot, page === 'register');
