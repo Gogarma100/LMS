@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView, Switch } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import api from '../services/api';
@@ -11,6 +11,10 @@ export default function DashboardScreen() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [modules, setModules] = useState([]);
+  const [completedModules, setCompletedModules] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -54,7 +58,6 @@ export default function DashboardScreen() {
 
   const handleUpdateProgress = async (courseId) => {
     const current = progressMap[courseId]?.percentageComplete || 0;
-    // For simplicity in mobile, we'll just increment by 10% or reset if 100%
     const nextProgress = current >= 100 ? 0 : current + 10;
     
     try {
@@ -64,6 +67,34 @@ export default function DashboardScreen() {
       fetchData();
     } catch (err) {
       console.error('Failed to update progress', err);
+    }
+  };
+
+  const handleToggleModule = async (courseId, moduleId) => {
+    try {
+      await api.post(`/api/courses/${courseId}/progress/toggle-module`, {
+        moduleId
+      });
+      // Refresh modules list and dashboard data
+      const progressRes = await api.get(`/api/courses/${courseId}/progress`);
+      setCompletedModules(progressRes.data.completedModules || []);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to toggle module', err);
+    }
+  };
+
+  const openModulesModal = async (course) => {
+    try {
+      const [courseRes, progressRes] = await Promise.all([
+        api.get(`/api/courses/${course.id}`),
+        api.get(`/api/courses/${course.id}/progress`)
+      ]);
+      setModules(courseRes.data.modules || []);
+      setCompletedModules(progressRes.data.completedModules || []);
+      setSelectedCourse(course);
+    } catch (err) {
+      console.error('Failed to fetch modules', err);
     }
   };
 
@@ -140,12 +171,20 @@ export default function DashboardScreen() {
                       <Text style={styles.btnText}>{isEnrolled ? 'Unenroll' : 'Enroll Now'}</Text>
                     </TouchableOpacity>
                     {isEnrolled && (
-                      <TouchableOpacity 
-                        style={styles.progressBtn} 
-                        onPress={() => handleUpdateProgress(item.id)}
-                      >
-                        <Text style={styles.btnText}>+10%</Text>
-                      </TouchableOpacity>
+                      <>
+                        <TouchableOpacity 
+                          style={styles.progressBtn} 
+                          onPress={() => handleUpdateProgress(item.id)}
+                        >
+                          <Text style={styles.btnText}>+10%</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.modulesBtn} 
+                          onPress={() => openModulesModal(item)}
+                        >
+                          <Text style={styles.btnText}>Modules</Text>
+                        </TouchableOpacity>
+                      </>
                     )}
                   </>
                 )}
@@ -155,6 +194,45 @@ export default function DashboardScreen() {
         }}
         contentContainerStyle={styles.list}
       />
+
+      <Modal
+        visible={!!selectedCourse}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedCourse(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{selectedCourse?.title} Modules</Text>
+            <ScrollView style={styles.moduleList}>
+              {modules.length > 0 ? (
+                modules.sort((a, b) => a.order - b.order).map(mod => (
+                  <View key={mod.id} style={styles.moduleItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.moduleTitle}>{mod.title}</Text>
+                      <Text style={styles.moduleContent}>{mod.content}</Text>
+                    </View>
+                    <Switch
+                      value={completedModules.includes(mod.id)}
+                      onValueChange={() => handleToggleModule(selectedCourse.id, mod.id)}
+                      trackColor={{ false: "#e2e8f0", true: "#10b981" }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noModules}>No modules found for this course.</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity 
+              style={styles.closeBtn} 
+              onPress={() => setSelectedCourse(null)}
+            >
+              <Text style={styles.btnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -179,6 +257,16 @@ const styles = StyleSheet.create({
   enrollBtn: { backgroundColor: '#10b981', padding: 10, borderRadius: 8, alignItems: 'center', flex: 2 },
   unenrollBtn: { backgroundColor: '#ef4444' },
   progressBtn: { backgroundColor: '#6366f1', padding: 10, borderRadius: 8, alignItems: 'center', flex: 1 },
+  modulesBtn: { backgroundColor: '#3b82f6', padding: 10, borderRadius: 8, alignItems: 'center', flex: 1.5 },
   adminBtn: { backgroundColor: '#3b82f6', padding: 10, borderRadius: 8, alignItems: 'center', flex: 1 },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', maxHeight: '80%', backgroundColor: '#fff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 20, textAlign: 'center' },
+  moduleList: { marginBottom: 20 },
+  moduleItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  moduleTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
+  moduleContent: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  noModules: { textAlign: 'center', color: '#64748b', marginVertical: 20 },
+  closeBtn: { backgroundColor: '#64748b', padding: 15, borderRadius: 10, alignItems: 'center' },
 });

@@ -51,6 +51,27 @@ class Course {
 
   @OneToMany(() => CourseProgress, (progress) => progress.course)
   progress!: CourseProgress[];
+
+  @OneToMany(() => Module, (module) => module.course, { cascade: true })
+  modules!: Module[];
+}
+
+@Entity()
+class Module {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: "varchar" })
+  title!: string;
+
+  @Column({ type: "text", nullable: true })
+  content!: string;
+
+  @Column({ type: "integer", default: 0 })
+  order!: number;
+
+  @ManyToOne(() => Course, (course) => course.modules)
+  course!: Course;
 }
 
 @Entity()
@@ -77,7 +98,7 @@ const AppDataSource = new DataSource({
   database: "database.sqlite",
   synchronize: true,
   logging: false,
-  entities: [User, Course, CourseProgress],
+  entities: [User, Course, CourseProgress, Module],
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || "kokostream-secret";
@@ -89,15 +110,45 @@ async function startServer() {
   // Seed data if empty
   const courseRepo = AppDataSource.getRepository(Course);
   const userRepo = AppDataSource.getRepository(User);
+  const moduleRepo = AppDataSource.getRepository(Module);
 
-  // Seed courses
+  // Seed courses and modules
   const courseCount = await courseRepo.count();
   if (courseCount === 0) {
-    await courseRepo.save([
-      { title: "Introduction to Web Development", description: "Learn the basics of HTML, CSS, and JS." },
-      { title: "Advanced React Patterns", description: "Master hooks, context, and performance." },
-      { title: "Node.js Backend Mastery", description: "Build scalable APIs with Express and TypeORM." },
-    ]);
+    const courses = [
+      { 
+        title: "Introduction to Web Development", 
+        description: "Learn the basics of HTML, CSS, and JS.",
+        modules: [
+          { title: "HTML Basics", content: "Learn about tags, elements, and attributes.", order: 1 },
+          { title: "CSS Styling", content: "Learn about selectors, colors, and layout.", order: 2 },
+          { title: "JavaScript Fundamentals", content: "Learn about variables, functions, and loops.", order: 3 },
+        ]
+      },
+      { 
+        title: "Advanced React Patterns", 
+        description: "Master hooks, context, and performance.",
+        modules: [
+          { title: "Custom Hooks", content: "Learn how to build reusable logic.", order: 1 },
+          { title: "Context API", content: "Manage global state without prop drilling.", order: 2 },
+          { title: "Performance Optimization", content: "Use useMemo and useCallback effectively.", order: 3 },
+        ]
+      },
+      { 
+        title: "Node.js Backend Mastery", 
+        description: "Build scalable APIs with Express and TypeORM.",
+        modules: [
+          { title: "Express Middleware", content: "Understand how to process requests.", order: 1 },
+          { title: "Database Integration", content: "Connect to SQL databases with TypeORM.", order: 2 },
+          { title: "Authentication & Security", content: "Secure your API with JWT and bcrypt.", order: 3 },
+        ]
+      },
+    ];
+
+    for (const c of courses) {
+      const course = courseRepo.create(c);
+      await courseRepo.save(course);
+    }
   }
 
   // Seed Admin User
@@ -194,8 +245,18 @@ async function startServer() {
 
   app.get("/api/courses", authenticateToken, async (req, res) => {
     const courseRepo = AppDataSource.getRepository(Course);
-    const courses = await courseRepo.find();
+    const courses = await courseRepo.find({ relations: ["modules"] });
     res.json(courses);
+  });
+
+  app.get("/api/courses/:id", authenticateToken, async (req, res) => {
+    const courseRepo = AppDataSource.getRepository(Course);
+    const course = await courseRepo.findOne({
+      where: { id: parseInt(req.params.id) },
+      relations: ["modules"]
+    });
+    if (!course) return res.status(404).json({ message: "Course not found" });
+    res.json(course);
   });
 
   // Admin Course Management
@@ -208,13 +269,25 @@ async function startServer() {
   });
 
   app.put("/api/courses/:id", authenticateToken, isAdmin, async (req, res) => {
-    const { title, description } = req.body;
+    const { title, description, modules } = req.body;
     const courseRepo = AppDataSource.getRepository(Course);
-    const course = await courseRepo.findOneBy({ id: parseInt(req.params.id) });
+    const course = await courseRepo.findOne({
+      where: { id: parseInt(req.params.id) },
+      relations: ["modules"]
+    });
     if (!course) return res.status(404).json({ message: "Course not found" });
 
     course.title = title || course.title;
     course.description = description || course.description;
+    
+    if (modules) {
+      course.modules = modules.map((m: any) => ({
+        ...m,
+        id: m.id || undefined, // Ensure new modules don't have an ID
+        course: course
+      }));
+    }
+
     await courseRepo.save(course);
     res.json(course);
   });
@@ -337,6 +410,59 @@ async function startServer() {
     } else {
       if (percentageComplete !== undefined) progress.percentageComplete = percentageComplete;
       if (completedModules !== undefined) progress.completedModules = JSON.stringify(completedModules);
+    }
+
+    await progressRepo.save(progress);
+    res.json({
+      ...progress,
+      completedModules: JSON.parse(progress.completedModules)
+    });
+  });
+
+  app.post("/api/courses/:id/progress/toggle-module", authenticateToken, async (req: any, res: any) => {
+    const { moduleId } = req.body;
+    const progressRepo = AppDataSource.getRepository(CourseProgress);
+    const userRepo = AppDataSource.getRepository(User);
+    const courseRepo = AppDataSource.getRepository(Course);
+    const moduleRepo = AppDataSource.getRepository(Module);
+
+    const courseId = parseInt(req.params.id);
+    const course = await courseRepo.findOne({ where: { id: courseId }, relations: ["modules"] });
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    const module = await moduleRepo.findOneBy({ id: moduleId, course: { id: courseId } });
+    if (!module) return res.status(404).json({ message: "Module not found in this course" });
+
+    let progress = await progressRepo.findOne({
+      where: { 
+        user: { id: req.user.id },
+        course: { id: courseId }
+      }
+    });
+
+    if (!progress) {
+      const user = await userRepo.findOneBy({ id: req.user.id });
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      progress = progressRepo.create({
+        user,
+        course,
+        percentageComplete: 0,
+        completedModules: JSON.stringify([moduleId])
+      });
+    } else {
+      let completed = JSON.parse(progress.completedModules);
+      if (completed.includes(moduleId)) {
+        completed = completed.filter((id: number) => id !== moduleId);
+      } else {
+        completed.push(moduleId);
+      }
+      progress.completedModules = JSON.stringify(completed);
+      
+      // Update percentage automatically
+      if (course.modules.length > 0) {
+        progress.percentageComplete = Math.round((completed.length / course.modules.length) * 100);
+      }
     }
 
     await progressRepo.save(progress);

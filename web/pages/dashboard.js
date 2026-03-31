@@ -1,3 +1,7 @@
+import { showCourseModal } from '../components/CourseModal.js';
+import { showProgressModal } from '../components/ProgressModal.js';
+import { showEnrolledUsersModal } from '../components/EnrolledUsersModal.js';
+
 export const dashboardPage = async (container) => {
     const role = localStorage.getItem('userRole');
     const token = localStorage.getItem('accessToken');
@@ -100,7 +104,7 @@ export const dashboardPage = async (container) => {
                         const card = e.target.closest('.course-card');
                         const id = card.dataset.id;
                         const currentProgress = progressMap[id] ? progressMap[id].percentageComplete : 0;
-                        showProgressModal(id, currentProgress);
+                        showProgressModal(id, currentProgress, token, fetchCourses);
                     };
                 });
 
@@ -124,14 +128,14 @@ export const dashboardPage = async (container) => {
                             const id = card.dataset.id;
                             const title = card.querySelector('h3').innerText;
                             const desc = card.querySelector('p').innerText;
-                            showCourseModal({ id, title, description: desc });
+                            showCourseModal({ id, title, description: desc }, token, fetchCourses);
                         };
                     });
 
                     grid.querySelectorAll('.view-users-btn').forEach(btn => {
                         btn.onclick = async (e) => {
                             const id = e.target.closest('.course-card').dataset.id;
-                            showEnrolledUsersModal(id);
+                            showEnrolledUsersModal(id, token);
                         };
                     });
                 }
@@ -143,149 +147,9 @@ export const dashboardPage = async (container) => {
         }
     };
 
-    const showProgressModal = (courseId, currentProgress) => {
-        const modal = document.createElement('div');
-        modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;";
-        modal.innerHTML = `
-            <div class="auth-container" style="margin: 0; width: 90%; max-width: 400px;">
-                <h2>Update Progress</h2>
-                <form id="progressForm">
-                    <div class="form-group">
-                        <label>Percentage Complete (${currentProgress}%)</label>
-                        <input type="range" id="m-progress" min="0" max="100" value="${currentProgress}" style="width: 100%;">
-                        <div style="text-align: center; font-weight: bold; margin-top: 0.5rem;" id="progressValue">${currentProgress}%</div>
-                    </div>
-                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button type="submit">Save</button>
-                        <button type="button" id="closeProgressModal" style="background: #64748b;">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        const rangeInput = modal.querySelector('#m-progress');
-        const valueDisplay = modal.querySelector('#progressValue');
-        rangeInput.oninput = () => {
-            valueDisplay.innerText = `${rangeInput.value}%`;
-        };
-
-        modal.querySelector('#closeProgressModal').onclick = () => modal.remove();
-        modal.querySelector('#progressForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const percentageComplete = parseInt(rangeInput.value);
-
-            const res = await fetch(`/api/courses/${courseId}/progress`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ percentageComplete })
-            });
-
-            if (res.ok) {
-                modal.remove();
-                fetchCourses();
-            } else {
-                alert('Failed to update progress');
-            }
-        };
-    };
-
-    const showEnrolledUsersModal = async (courseId) => {
-        const modal = document.createElement('div');
-        modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;";
-        modal.innerHTML = `
-            <div class="auth-container" style="margin: 0; width: 90%; max-width: 500px;">
-                <h2>Enrolled Users</h2>
-                <div id="usersList" style="margin: 1rem 0; max-height: 300px; overflow-y: auto;">
-                    <p>Loading users...</p>
-                </div>
-                <button type="button" id="closeUsersModal" style="background: #64748b;">Close</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        modal.querySelector('#closeUsersModal').onclick = () => modal.remove();
-
-        try {
-            const res = await fetch(`/api/courses/${courseId}/users`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const users = await res.json();
-                const list = modal.querySelector('#usersList');
-                if (users.length === 0) {
-                    list.innerHTML = '<p>No users enrolled yet.</p>';
-                } else {
-                    list.innerHTML = users.map(u => `
-                        <div style="padding: 0.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;">
-                            <span>${u.email}</span>
-                            <span style="font-size: 0.75rem; color: #64748b;">${u.role}</span>
-                        </div>
-                    `).join('');
-                }
-            }
-        } catch (err) {
-            modal.querySelector('#usersList').innerHTML = '<p>Error loading users.</p>';
-        }
-    };
-
-    const showCourseModal = (course = null) => {
-        const modal = document.createElement('div');
-        modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;";
-        modal.innerHTML = `
-            <div class="auth-container" style="margin: 0; width: 90%; max-width: 500px;">
-                <h2>${course ? 'Edit Course' : 'Add New Course'}</h2>
-                <form id="courseForm">
-                    <div class="form-group">
-                        <label>Title</label>
-                        <input type="text" id="m-title" value="${course ? course.title : ''}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea id="m-desc" style="width: 100%; padding: 0.625rem; border: 1px solid var(--border); border-radius: 0.375rem; min-height: 100px;">${course ? course.description : ''}</textarea>
-                    </div>
-                    <div style="display: flex; gap: 1rem;">
-                        <button type="submit">Save</button>
-                        <button type="button" id="closeModal" style="background: #64748b;">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        modal.querySelector('#closeModal').onclick = () => modal.remove();
-        modal.querySelector('#courseForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const title = modal.querySelector('#m-title').value;
-            const description = modal.querySelector('#m-desc').value;
-
-            const method = course ? 'PUT' : 'POST';
-            const url = course ? `/api/courses/${course.id}` : '/api/courses';
-
-            const res = await fetch(url, {
-                method,
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ title, description })
-            });
-
-            if (res.ok) {
-                modal.remove();
-                fetchCourses();
-            } else {
-                alert('Failed to save course');
-            }
-        };
-    };
-
     if (role === 'admin') {
         const addBtn = header.querySelector('#addCourseBtn');
-        if (addBtn) addBtn.onclick = () => showCourseModal();
+        if (addBtn) addBtn.onclick = () => showCourseModal(null, token, fetchCourses);
     }
 
     fetchCourses();
